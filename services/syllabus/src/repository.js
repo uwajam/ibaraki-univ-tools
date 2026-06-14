@@ -110,6 +110,24 @@ export async function getCourse(db, courseId) {
   return { error: "Unsupported courseId format" };
 }
 
+export async function getCourseByTimetableCode(db, timetableCode, academicYear) {
+  const code = String(timetableCode ?? "").toUpperCase();
+  if (!/^[A-Z0-9-]{1,32}$/.test(code)) {
+    return { error: "Unsupported timetableCode format" };
+  }
+
+  const values = [code, code];
+  let sql = "SELECT * FROM courses WHERE (timetable_code = ? OR course_number = ?)";
+  if (academicYear) {
+    sql += " AND academic_year = ?";
+    values.push(Number(academicYear));
+  }
+  sql += " ORDER BY academic_year DESC, timetable_code ASC LIMIT 1";
+
+  const row = await db.prepare(sql).bind(...values).first();
+  return row ? rowToCourseJson(row) : { error: `Course '${code}' was not found` };
+}
+
 export async function getCourseByYearAndSyllabusId(db, academicYear, syllabusId) {
   const row = await db.prepare(
     "SELECT * FROM courses WHERE academic_year = ? AND syllabus_id = ? LIMIT 1"
@@ -123,11 +141,14 @@ function rowToSearchJson(row) {
     source: row.source,
     academicYear: row.academic_year,
     courseNumber: row.course_number ?? row.timetable_code,
+    timetableCode: row.timetable_code,
     syllabusId: row.syllabus_id,
+    department: row.department,
     title: row.title,
     alternateTitle: row.alternate_title,
     credits: row.credits,
     yearLevel: row.year_level,
+    targetYear: row.target_year,
     term: row.term,
     schedule: row.schedule,
     scheduleDays: loadJson(row.schedule_days_json, []),

@@ -423,6 +423,34 @@ export const SITE_HTML = `<!doctype html>
       border-radius: 999px;
       font-size: 13px;
     }
+    .api-note {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .api-note h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    .api-note p {
+      margin: 0;
+      color: var(--muted);
+    }
+    .api-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .api-list code {
+      display: block;
+      padding: 10px 12px;
+      background: #f7f9f7;
+      border-radius: 6px;
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
     .connect {
       display: grid;
       gap: 22px;
@@ -702,6 +730,15 @@ export const SITE_HTML = `<!doctype html>
             <h3>PDF本文を検索する</h3>
             <p>履修要項などの公開PDFから、関連する本文チャンク、ページ番号、文書URLを返します。</p>
             <div class="params"><span>q</span><span>query</span><span>queries</span><span>academicYear</span><span>documentId</span><span>mode</span><span>includeToc</span><span>limit</span></div>
+          </div>
+        </div>
+        <div class="api-note">
+          <h3>HTTP APIとしても利用できます</h3>
+          <p>MCPクライアントを使わず、保存済みのシラバスデータを直接JSONで取得できます。時間割コードから授業詳細を取得する場合は、年度を指定すると安定します。</p>
+          <div class="api-list">
+            <code>GET /api/syllabus/timetable-codes/T3003?academicYear=2026</code>
+            <code>GET /api/syllabus/courses/T3003?academicYear=2026</code>
+            <code>GET /api/syllabus/search?q=情報&amp;academicYear=2026</code>
           </div>
         </div>
       </div>
