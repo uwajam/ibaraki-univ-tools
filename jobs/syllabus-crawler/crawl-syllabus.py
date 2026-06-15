@@ -332,6 +332,7 @@ def parse_course(url, fallback_year, html):
     parser.feed(html)
     fields = {}
     sections = []
+    class_schedule_details = extract_class_schedule_details(parser.rows)
     for row in parser.rows:
         header = next((text for tag, text in row if tag == "th"), "")
         value = "\n".join(text for tag, text in row if tag == "td").strip()
@@ -340,6 +341,12 @@ def parse_course(url, fallback_year, html):
         key = normalize_heading(header)
         fields[key] = value
         sections.append({"heading": key, "content": value})
+    if class_schedule_details:
+        sections.append({
+            "heading": "授業計画詳細情報",
+            "type": "classScheduleDetails",
+            "rows": class_schedule_details,
+        })
 
     parsed = urlparse(url)
     parts = parsed.path.split("/")
@@ -397,6 +404,36 @@ def upsert_course(conn, row):
         f"ON CONFLICT(url) DO UPDATE SET {updates}",
         [row[column] for column in columns],
     )
+
+
+def extract_class_schedule_details(rows):
+    details = []
+    in_schedule_table = False
+    for row in rows:
+        cells = [text for _tag, text in row]
+        if not cells:
+            continue
+        header_text = " ".join(cells)
+        if any(tag == "th" for tag, _text in row):
+            in_schedule_table = (
+                "No." in header_text
+                and ("Time" in header_text or "日時" in header_text)
+                and ("Methods" in header_text or "学修方法" in header_text)
+            )
+            continue
+        if not in_schedule_table:
+            continue
+        td_values = [text for tag, text in row if tag == "td"]
+        if len(td_values) < 5:
+            continue
+        details.append({
+            "no": td_values[0],
+            "timeDateAndTime": td_values[1],
+            "subjectAndInstructorPosition": td_values[2],
+            "methodsAndContents": td_values[3],
+            "notes": td_values[4],
+        })
+    return details
 
 
 def normalize_text(value):

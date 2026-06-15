@@ -161,14 +161,22 @@ function rowToSearchJson(row) {
 }
 
 function rowToCourseJson(row) {
+  const sections = loadJson(row.sections_json, []);
   return {
     ...rowToSearchJson(row),
     remarks: row.remarks,
     detailLanguage: row.detail_language,
     detailFetchedAt: row.detail_fetched_at,
-    sections: loadJson(row.sections_json, []),
+    classScheduleDetails: extractClassScheduleDetails(sections),
+    sections,
     servedFrom: row.served_from ?? "d1"
   };
+}
+
+function extractClassScheduleDetails(sections) {
+  if (!Array.isArray(sections)) return [];
+  const section = sections.find((value) => value?.type === "classScheduleDetails");
+  return Array.isArray(section?.rows) ? section.rows : [];
 }
 
 function loadJson(value, fallback) {
