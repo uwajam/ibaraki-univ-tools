@@ -1,6 +1,7 @@
 import { emptyResponse, jsonResponse, rpcError, rpcResult } from "../../../packages/shared/src/http.js";
-import { handlePdfApiRequest } from "../../../services/pdf/src/index.js";
-import { handleSyllabusApiRequest } from "../../../services/syllabus/src/index.js";
+import { methodNotAllowedResponse } from "../../../packages/shared/src/router.js";
+import { handlePdfApiRequest, pdfToolDefinitions } from "../../../services/pdf/src/index.js";
+import { handleSyllabusApiRequest, syllabusToolDefinitions } from "../../../services/syllabus/src/index.js";
 
 const SERVER_INFO = {
   name: "iu-mcp-gateway",
@@ -9,67 +10,26 @@ const SERVER_INFO = {
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
-const TOOLS = [
-  {
-    name: "syllabus.search_courses",
-    description: "Search cached Ibaraki University syllabus courses via the syllabus API.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "string" },
-        keyword: { type: "string" },
-        academicYear: { type: "integer" },
-        instructor: { type: "string" },
-        term: { type: "string" },
-        day: { type: "string" },
-        period: { type: "string" },
-        courseNumberPrefix: { type: "string" },
-        limit: { type: "integer", minimum: 1, maximum: 50 }
-      }
-    }
+const SERVICE_CLIENTS = {
+  "/api/syllabus/": {
+    baseUrlEnv: "SYLLABUS_API_BASE_URL",
+    handler: handleSyllabusApiRequest,
+    errorLabel: "syllabus api error"
   },
-  {
-    name: "syllabus.get_course",
-    description: "Get a cached Ibaraki University syllabus course by courseId, syllabusId, course number, timetable code, or official URL.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        courseId: { type: "string" }
-      },
-      required: ["courseId"]
-    }
-  },
-  {
-    name: "pdf.search_documents",
-    description: "Search indexed public Ibaraki University academic PDF document chunks.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        q: { type: "string" },
-        query: { type: "string" },
-        queries: {
-          type: "array",
-          items: { type: "string" }
-        },
-        documentId: { type: "string" },
-        academicYear: { type: "integer" },
-        includeToc: { type: "boolean" },
-        mode: {
-          type: "string",
-          enum: ["hybrid", "keyword"]
-        },
-        limit: { type: "integer", minimum: 1, maximum: 20 }
-      }
-    }
+  "/api/pdf/": {
+    baseUrlEnv: "PDF_API_BASE_URL",
+    handler: handlePdfApiRequest,
+    errorLabel: "pdf api error"
   }
-];
+};
+
+const TOOL_DEFINITIONS = [...syllabusToolDefinitions, ...pdfToolDefinitions];
+const TOOL_HANDLERS = new Map(TOOL_DEFINITIONS.map(({ call, ...tool }) => [tool.name, { tool, call }]));
+const TOOLS = TOOL_DEFINITIONS.map(({ call: _call, ...tool }) => tool);
 
 export async function handleMcpGatewayRequest(request, env) {
-  if (request.method === "GET" || request.method === "DELETE") {
-    return methodNotAllowedResponse();
-  }
   if (request.method !== "POST") {
-    return methodNotAllowedResponse();
+    return methodNotAllowedResponse("POST, OPTIONS");
   }
 
   let message;
@@ -131,103 +91,58 @@ async function handleMcpMessage(message, request, env) {
 }
 
 async function callTool(name, args, request, env) {
-  if (name === "syllabus.search_courses") {
-    return callSyllabusApi(request, env, "/api/syllabus/search", {
-      method: "POST",
-      body: JSON.stringify(args)
-    });
-  }
+  const definition = TOOL_HANDLERS.get(name);
+  if (!definition) return { __rpcError: true, message: `Unknown tool: ${name}` };
 
-  if (name === "syllabus.get_course") {
-    const courseId = String(args.courseId ?? "");
-    if (!courseId) return { error: "courseId is required" };
-    return callSyllabusApi(request, env, `/api/syllabus/courses/${encodeURIComponent(courseId)}`);
-  }
-
-  if (name === "pdf.search_documents") {
-    return callPdfApi(request, env, "/api/pdf/search", {
-      method: "POST",
-      body: JSON.stringify(args)
-    });
-  }
-
-  return { __rpcError: true, message: `Unknown tool: ${name}` };
+  const call = definition.call(args);
+  if (call.error) return call;
+  return callServiceApi(request, env, call.path, call.init ?? {});
 }
 
-async function callSyllabusApi(request, env, path, init = {}) {
-  if (!env.SYLLABUS_API_BASE_URL) {
-    return callInternalApi(request, env, path, init, handleSyllabusApiRequest);
+async function callServiceApi(request, env, path, init = {}) {
+  const service = findServiceClient(path);
+  if (!service) return { error: `No service is registered for ${path}` };
+
+  const baseUrl = env[service.baseUrlEnv];
+  if (!baseUrl) {
+    return callInternalApi(request, env, path, init, service.handler, service.errorLabel);
   }
 
-  const url = new URL(env.SYLLABUS_API_BASE_URL || request.url);
+  const url = new URL(baseUrl || request.url);
   url.pathname = path;
   url.search = "";
 
-  const response = await fetch(url.toString(), {
-    method: init.method ?? "GET",
-    headers: {
-      "content-type": "application/json",
-      ...(init.headers ?? {})
-    },
-    body: init.body
-  });
-
+  const response = await fetch(url.toString(), buildApiRequestInit(init));
   const result = await response.json();
-  return response.ok ? result : { error: result.error ?? "syllabus api error", status: response.status };
+  return response.ok ? result : { error: result.error ?? service.errorLabel, status: response.status };
 }
 
-async function callPdfApi(request, env, path, init = {}) {
-  if (!env.PDF_API_BASE_URL) {
-    return callInternalApi(request, env, path, init, handlePdfApiRequest);
-  }
-
-  const url = new URL(env.PDF_API_BASE_URL || request.url);
-  url.pathname = path;
-  url.search = "";
-
-  const response = await fetch(url.toString(), {
-    method: init.method ?? "GET",
-    headers: {
-      "content-type": "application/json",
-      ...(init.headers ?? {})
-    },
-    body: init.body
-  });
-
-  const result = await response.json();
-  return response.ok ? result : { error: result.error ?? "pdf api error", status: response.status };
+function findServiceClient(path) {
+  return Object.entries(SERVICE_CLIENTS).find(([prefix]) => path.startsWith(prefix))?.[1];
 }
 
-async function callInternalApi(request, env, path, init, handler) {
+async function callInternalApi(request, env, path, init, handler, errorLabel) {
   const url = new URL(request.url);
   url.pathname = path;
   url.search = "";
 
-  const apiRequest = new Request(url.toString(), {
+  const apiRequest = new Request(url.toString(), buildApiRequestInit(init));
+  const response = await handler(apiRequest, env);
+  const result = await response.json();
+  return response.ok ? result : { error: result.error ?? errorLabel, status: response.status };
+}
+
+function buildApiRequestInit(init) {
+  return {
     method: init.method ?? "GET",
     headers: {
       "content-type": "application/json",
       ...(init.headers ?? {})
     },
     body: init.body
-  });
-  const response = await handler(apiRequest, env);
-  const result = await response.json();
-  return response.ok ? result : { error: result.error ?? "internal api error", status: response.status };
+  };
 }
 
 function acceptedResponse() {
   return emptyResponse(202);
-}
-
-function methodNotAllowedResponse() {
-  return new Response(null, {
-    status: 405,
-    headers: {
-      allow: "POST, OPTIONS",
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "accept, content-type, mcp-protocol-version, mcp-session-id"
-    }
-  });
 }

@@ -32,7 +32,7 @@ services/library
   将来の図書館API用の境界。現時点では未実装。
 
 packages/shared
-  共通レスポンス、JSON-RPC helperなど。
+  共通レスポンス、JSON-RPC helper、宣言的HTTP routerなど。
 
 jobs/syllabus-crawler
   大学サイトからシラバスをページ単位で収集し、SQLite/D1 seedを生成する。
@@ -44,7 +44,7 @@ migrations
   D1 schema。
 
 src/worker.js
-  Cloudflare Workerの薄いHTTPルーター。
+  Cloudflare Workerの薄いHTTPルーター。サービス追加時はservice側のroute/tool定義を増やし、ここではprefix委譲だけを追加する。
 ```
 
 ## Responsibility
@@ -62,8 +62,11 @@ src/worker.js
   - `services/syllabus/src/index.js`
   - `/api/syllabus/search`、`/api/syllabus/courses/:id`、`/api/syllabus/health` を提供します。
 - MCP tools
-  - `apps/gateway/src/index.js`
-  - `syllabus.search_courses` / `syllabus.get_course` / `pdf.search_documents` を公開し、tool呼び出し時に各service APIをfetchします。
+  - `services/*/src/index.js` の `*ToolDefinitions` に各サービスがtool schemaとAPI呼び出し先を定義します。
+  - `apps/gateway/src/index.js` は各サービスのtool定義を集約し、tool呼び出し時に登録済みservice APIへ委譲します。
+- HTTP routing
+  - `packages/shared/src/router.js` の `route()` / `createRouter()` でpath parameter付きルートを宣言します。
+  - 各service APIは `*ApiRoutes` として公開し、Workerは `/api/<service>/...` prefixで委譲します。
 
 ## Setup
 
