@@ -161,13 +161,15 @@ function rowToSearchJson(row) {
 }
 
 function rowToCourseJson(row) {
-  const sections = loadJson(row.sections_json, []);
+  const rawSections = loadJson(row.sections_json, []);
+  const sections = normalizeSections(rawSections);
   return {
     ...rowToSearchJson(row),
     remarks: row.remarks,
     detailLanguage: row.detail_language,
     detailFetchedAt: row.detail_fetched_at,
-    classScheduleDetails: extractClassScheduleDetails(sections),
+    classScheduleDetails: extractClassScheduleDetails(rawSections),
+    sectionMap: buildSectionMap(sections),
     sections,
     servedFrom: row.served_from ?? "d1"
   };
@@ -176,7 +178,156 @@ function rowToCourseJson(row) {
 function extractClassScheduleDetails(sections) {
   if (!Array.isArray(sections)) return [];
   const section = sections.find((value) => value?.type === "classScheduleDetails");
-  return Array.isArray(section?.rows) ? section.rows : [];
+  if (Array.isArray(section?.rows)) {
+    return section.rows.map(normalizeClassScheduleDetail).filter(Boolean);
+  }
+
+  return sections.flatMap(parseLegacyClassScheduleSection).filter(Boolean);
+}
+
+function normalizeSections(sections) {
+  if (!Array.isArray(sections)) return [];
+  return sections
+    .filter((section) => section && section.type !== "classScheduleDetails")
+    .filter((section) => !isLegacyClassScheduleSection(section))
+    .map((section) => ({
+      heading: String(section.heading ?? "").trim(),
+      content: String(section.content ?? "").trim()
+    }))
+    .filter((section) => section.heading && section.content);
+}
+
+function buildSectionMap(sections) {
+  const result = {};
+  for (const section of sections) {
+    if (!result[section.heading]) result[section.heading] = section.content;
+  }
+  return result;
+}
+
+function normalizeClassScheduleDetail(row) {
+  if (!row || typeof row !== "object") return null;
+  const no = toNumberOrNull(row.no);
+  const lessonNo = toNumberOrNull(row.lessonNo) ?? extractLessonNo(row.time ?? row.timeDateAndTime);
+  return {
+    no,
+    lessonNo,
+    time: cleanText(row.time ?? row.timeDateAndTime ?? ""),
+    subject: cleanText(row.subject ?? splitScheduleSubject(row.subjectAndInstructorPosition ?? "").subject),
+    instructors: Array.isArray(row.instructors) ? row.instructors.map(cleanText).filter(Boolean) : [],
+    methodsAndContents: cleanText(row.methodsAndContents ?? ""),
+    notes: cleanText(row.notes ?? ""),
+    studyMinutes: {
+      methods: Array.isArray(row.studyMinutes?.methods) ? row.studyMinutes.methods : parseStudyMinutes(row.methodsAndContents),
+      notes: Array.isArray(row.studyMinutes?.notes) ? row.studyMinutes.notes : parseStudyMinutes(row.notes)
+    },
+    raw: row.raw ?? {
+      no: row.no ?? "",
+      time: row.time ?? row.timeDateAndTime ?? "",
+      subject: row.subjectAndInstructorPosition ?? row.subject ?? "",
+      methodsAndContents: row.methodsAndContents ?? "",
+      notes: row.notes ?? ""
+    }
+  };
+}
+
+function parseLegacyClassScheduleSection(section) {
+  if (!isLegacyClassScheduleSection(section)) return [];
+  const heading = cleanText(section.heading);
+  const content = cleanText(section.content);
+  if (/^\d+$/.test(heading)) {
+    const parsed = parseLegacyClassScheduleLine(`${heading} ${content}`);
+    return parsed ? [parsed] : [];
+  }
+
+  return parseLegacyClassScheduleBlob(content);
+}
+
+function isLegacyClassScheduleSection(section) {
+  const heading = cleanText(section?.heading);
+  const content = normalizeDigits(section?.content);
+  if (heading === "No." && /(?:Time|日時|Methods|学修方法|Notes|備考)/.test(content)) return true;
+  return /^\d+$/.test(heading) && /^(?:第?\d+回|\d+\s+)/.test(content);
+}
+
+function parseLegacyClassScheduleBlob(content) {
+  const text = normalizeDigits(cleanText(content)).replace(
+    /^回（日?時?）.*?(?:備考|Notes)\s*/u,
+    ""
+  );
+  const matches = [...text.matchAll(/(?:^|\s)(\d+)\s+((?:第?\d+回|\d+)\s+[\s\S]*?)(?=\s+\d+\s+(?:第?\d+回|\d+)\s+|$)/g)];
+  return matches
+    .map((match) => parseLegacyClassScheduleLine(`${match[1]} ${match[2]}`))
+    .filter(Boolean);
+}
+
+function parseLegacyClassScheduleLine(line) {
+  const normalized = normalizeDigits(cleanText(line));
+  const match = normalized.match(/^(\d+)\s+(?:第?(\d+)回|(\d+))\s+([\s\S]+)$/);
+  if (!match) return null;
+  const lessonNo = match[2] ?? match[3];
+  const subjectWithInstructor = extractLegacySubject(match[4]);
+  const { subject, instructors } = splitScheduleSubject(subjectWithInstructor);
+  return {
+    no: Number(match[1]),
+    lessonNo: Number(lessonNo),
+    time: `第${lessonNo}回`,
+    subject,
+    instructors,
+    methodsAndContents: "",
+    notes: "",
+    studyMinutes: {
+      methods: parseStudyMinutes(match[4]),
+      notes: []
+    },
+    raw: normalized
+  };
+}
+
+function extractLegacySubject(value) {
+  const text = cleanText(value);
+  const [subject] = text.split(/(?=【|レポート|テキスト|全学教育機構|各班|課題|（約\d+時間）)/u);
+  return cleanText(subject || text);
+}
+
+function splitScheduleSubject(value) {
+  const text = cleanText(value);
+  const match = text.match(/（担当[:：](.+?)）/u);
+  if (!match) return { subject: text, instructors: [] };
+  return {
+    subject: cleanText(text.replace(match[0], "")),
+    instructors: match[1].split(/[、,，]/u).map(cleanText).filter(Boolean)
+  };
+}
+
+function extractLessonNo(value) {
+  const match = cleanText(value).match(/第?(\d+)回/u);
+  return match ? Number(match[1]) : null;
+}
+
+function parseStudyMinutes(value) {
+  return [...cleanText(value).matchAll(/学修時間[:：]\s*(\d+)\s*分/gu)].map((match) => Number(match[1]));
+}
+
+function toNumberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function cleanText(value) {
+  return String(value ?? "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeDigits(value) {
+  return cleanText(value).replace(/[０-９]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - 0xfee0)
+  );
 }
 
 function loadJson(value, fallback) {

@@ -334,6 +334,8 @@ def parse_course(url, fallback_year, html):
     sections = []
     class_schedule_details = extract_class_schedule_details(parser.rows)
     for row in parser.rows:
+        if is_class_schedule_header_row(row) or parse_class_schedule_row(row):
+            continue
         header = next((text for tag, text in row if tag == "th"), "")
         value = "\n".join(text for tag, text in row if tag == "td").strip()
         if not header or not value:
@@ -408,32 +410,79 @@ def upsert_course(conn, row):
 
 def extract_class_schedule_details(rows):
     details = []
-    in_schedule_table = False
     for row in rows:
-        cells = [text for _tag, text in row]
-        if not cells:
-            continue
-        header_text = " ".join(cells)
-        if any(tag == "th" for tag, _text in row):
-            in_schedule_table = (
-                "No." in header_text
-                and ("Time" in header_text or "日時" in header_text)
-                and ("Methods" in header_text or "学修方法" in header_text)
-            )
-            continue
-        if not in_schedule_table:
-            continue
-        td_values = [text for tag, text in row if tag == "td"]
-        if len(td_values) < 5:
-            continue
-        details.append({
-            "no": td_values[0],
-            "timeDateAndTime": td_values[1],
-            "subjectAndInstructorPosition": td_values[2],
-            "methodsAndContents": td_values[3],
-            "notes": td_values[4],
-        })
+        detail = parse_class_schedule_row(row)
+        if detail:
+            details.append(detail)
     return details
+
+
+def row_cell_texts(row):
+    return [text for _tag, text in row if text]
+
+
+def is_class_schedule_header_row(row):
+    header_text = " ".join(row_cell_texts(row))
+    return (
+        "No." in header_text
+        and ("Time" in header_text or "日時" in header_text)
+        and ("Methods" in header_text or "学修方法" in header_text)
+    )
+
+
+def parse_class_schedule_row(row):
+    cells = row_cell_texts(row)
+    if len(cells) < 4:
+        return None
+
+    no_text, time_text, subject_text, methods_text = cells[:4]
+    notes_text = cells[4] if len(cells) > 4 else ""
+    if not re.match(r"^\d+$", no_text):
+        return None
+    lesson_match = re.search(r"第?(\d+)回", time_text)
+    if not lesson_match:
+        return None
+
+    subject, instructors = split_schedule_subject(subject_text)
+    return {
+        "no": int(no_text),
+        "lessonNo": int(lesson_match.group(1)),
+        "time": time_text,
+        "timeDateAndTime": time_text,
+        "subject": subject,
+        "instructors": instructors,
+        "subjectAndInstructorPosition": subject_text,
+        "methodsAndContents": methods_text,
+        "notes": notes_text,
+        "studyMinutes": {
+            "methods": parse_study_minutes(methods_text),
+            "notes": parse_study_minutes(notes_text),
+        },
+        "raw": {
+            "no": no_text,
+            "time": time_text,
+            "subject": subject_text,
+            "methodsAndContents": methods_text,
+            "notes": notes_text,
+        },
+    }
+
+
+def split_schedule_subject(value):
+    text = normalize_text(value)
+    match = re.search(r"（担当[:：](.+?)）", text)
+    if not match:
+        return text, []
+    instructors = [
+        normalize_text(part)
+        for part in re.split(r"[、,，]", match.group(1))
+        if normalize_text(part)
+    ]
+    return normalize_text(text.replace(match.group(0), "")), instructors
+
+
+def parse_study_minutes(value):
+    return [int(match.group(1)) for match in re.finditer(r"学修時間[:：]\s*(\d+)\s*分", value or "")]
 
 
 def normalize_text(value):
