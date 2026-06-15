@@ -4,7 +4,7 @@
   "description": "MCP gateway for public Ibaraki University academic information.",
   "type": "module",
   "scripts": {
-    "check": "node --check src/worker.js && node --check apps/gateway/src/index.js && node --check apps/gateway/src/site.js && node --check services/syllabus/src/index.js && node --check services/syllabus/src/repository.js && node --check services/pdf/src/index.js && node --check services/pdf/src/repository.js && node --check packages/shared/src/http.js",
+    "check": "node --check src/worker.js && node --check apps/gateway/src/index.js && node --check apps/gateway/src/site.js && node --check services/syllabus/src/index.js && node --check services/syllabus/src/repository.js && node --check services/pdf/src/index.js && node --check services/pdf/src/repository.js && node --check packages/shared/src/http.js && node --check packages/shared/src/router.js",
     "cf:login": "wrangler login",
     "cf:whoami": "wrangler whoami",
     "d1:create": "wrangler d1 create ibaraki_syllabus",

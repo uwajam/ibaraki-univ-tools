@@ -2,6 +2,7 @@ import { handleMcpGatewayRequest } from "../apps/gateway/src/index.js";
 import { SITE_HTML } from "../apps/gateway/src/site.js";
 import { handlePdfApiRequest } from "../services/pdf/src/index.js";
 import { handleSyllabusApiRequest } from "../services/syllabus/src/index.js";
+import { createRouter, route } from "../packages/shared/src/router.js";
 import { emptyResponse, htmlResponse, jsonResponse, notFoundResponse, textResponse } from "../packages/shared/src/http.js";
 
 const ROBOTS_TXT = `# As a condition of accessing this website, you agree to abide by the following content signals:
@@ -26,40 +27,24 @@ Disallow: /health
 Disallow: /status
 `;
 
+const appRoutes = [
+  route("GET", "/", () => htmlResponse(SITE_HTML)),
+  route("GET", "/robots.txt", () => textResponse(ROBOTS_TXT, "text/plain; charset=utf-8")),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/mcp", (request, { env }) => handleMcpGatewayRequest(request, env)),
+  route("GET", "/health", () => jsonResponse({ ok: true, service: "iu-mcp-gateway" })),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/syllabus/:path*", (request, { env }) => handleSyllabusApiRequest(request, env)),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/pdf/:path*", (request, { env }) => handlePdfApiRequest(request, env))
+];
+
+const routeWorkerRequest = createRouter(appRoutes, { notFound: notFoundResponse });
+
 export default {
   async fetch(request, env) {
     try {
-      const url = new URL(request.url);
-
       if (request.method === "OPTIONS") {
         return emptyResponse(204);
       }
-
-      if (url.pathname === "/" && request.method === "GET") {
-        return htmlResponse(SITE_HTML);
-      }
-
-      if (url.pathname === "/robots.txt" && request.method === "GET") {
-        return textResponse(ROBOTS_TXT, "text/plain; charset=utf-8");
-      }
-
-      if (url.pathname === "/mcp") {
-        return handleMcpGatewayRequest(request, env);
-      }
-
-      if (url.pathname.startsWith("/api/syllabus/")) {
-        return handleSyllabusApiRequest(request, env);
-      }
-
-      if (url.pathname.startsWith("/api/pdf/")) {
-        return handlePdfApiRequest(request, env);
-      }
-
-      if (url.pathname === "/health" && request.method === "GET") {
-        return jsonResponse({ ok: true, service: "iu-mcp-gateway" });
-      }
-
-      return notFoundResponse();
+      return routeWorkerRequest(request, { env });
     } catch (error) {
       return jsonResponse({ error: "internal error", message: error.message }, 500);
     }

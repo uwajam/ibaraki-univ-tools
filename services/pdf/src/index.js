@@ -1,51 +1,46 @@
 import { jsonResponse } from "../../../packages/shared/src/http.js";
+import { argsFromSearchParams, createRouter, methodNotAllowedResponse, readJsonBody, route } from "../../../packages/shared/src/router.js";
 import { getPdfStats, searchDocuments } from "./repository.js";
 
-export async function handlePdfApiRequest(request, env) {
-  const url = new URL(request.url);
+export const pdfApiBasePath = "/api/pdf";
 
-  if (url.pathname === "/api/pdf/health" && request.method === "GET") {
+export const pdfToolDefinitions = [
+  {
+    name: "pdf.search_documents",
+    description: "Search indexed public Ibaraki University academic PDF document chunks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        q: { type: "string" },
+        query: { type: "string" },
+        queries: { type: "array", items: { type: "string" } },
+        documentId: { type: "string" },
+        academicYear: { type: "integer" },
+        includeToc: { type: "boolean" },
+        mode: { type: "string", enum: ["hybrid", "keyword"] },
+        limit: { type: "integer", minimum: 1, maximum: 20 }
+      }
+    },
+    call: (args) => ({ path: `${pdfApiBasePath}/search`, init: { method: "POST", body: JSON.stringify(args) } })
+  }
+];
+
+export const pdfApiRoutes = [
+  route("GET", `${pdfApiBasePath}/health`, async (_request, { env }) => {
     return jsonResponse({ ok: true, service: "iu-pdf-service", ...(await getPdfStats(env.DB)) });
-  }
+  }),
+  route("GET", `${pdfApiBasePath}/search`, async (request, { env }) => {
+    const url = new URL(request.url);
+    return jsonResponse(await searchDocuments(env.DB, argsFromSearchParams(url.searchParams, ["academicYear", "limit"])));
+  }),
+  route("POST", `${pdfApiBasePath}/search`, async (request, { env }) => {
+    return jsonResponse(await searchDocuments(env.DB, await readJsonBody(request)));
+  }),
+  route(["PUT", "PATCH", "DELETE"], `${pdfApiBasePath}/search`, () => methodNotAllowedResponse("GET, POST, OPTIONS"))
+];
 
-  if (url.pathname === "/api/pdf/search") {
-    if (request.method === "GET") {
-      return jsonResponse(await searchDocuments(env.DB, argsFromSearchParams(url.searchParams)));
-    }
-    if (request.method === "POST") {
-      return jsonResponse(await searchDocuments(env.DB, await readJsonBody(request)));
-    }
-    return methodNotAllowed("GET, POST, OPTIONS");
-  }
+const routePdfApiRequest = createRouter(pdfApiRoutes);
 
-  return jsonResponse({ error: "not found" }, 404);
-}
-
-function argsFromSearchParams(params) {
-  const args = {};
-  for (const [key, value] of params.entries()) {
-    args[key] = key === "limit" ? Number(value) : value;
-  }
-  return args;
-}
-
-async function readJsonBody(request) {
-  try {
-    const body = await request.json();
-    return body && typeof body === "object" ? body : {};
-  } catch {
-    return {};
-  }
-}
-
-function methodNotAllowed(allow) {
-  return new Response(null, {
-    status: 405,
-    headers: {
-      allow,
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "accept, content-type, mcp-protocol-version, mcp-session-id"
-    }
-  });
+export async function handlePdfApiRequest(request, env) {
+  return routePdfApiRequest(request, { env });
 }
