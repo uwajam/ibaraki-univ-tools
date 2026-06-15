@@ -8,7 +8,7 @@
 
 公開Workerは大学サイトへリアルタイム検索を行いません。シラバス検索はD1に投入済みの静的データだけを読みます。
 
-説明サイト: `https://syllabus.iu.mcp.uwaja.net/`
+説明サイト: `https://iu.mcp.uwaja.net/`
 
 ## Disclaimer
 
