@@ -2,7 +2,7 @@ import { jsonResponse } from "../../../packages/shared/src/http.js";
 import { argsFromSearchParams, createRouter, methodNotAllowedResponse, readJsonBody, route } from "../../../packages/shared/src/router.js";
 import { getPdfStats, searchDocuments } from "./repository.js";
 
-export const pdfApiBasePath = "/api/pdf";
+export const pdfApiBasePath = "/univ/ibaraki/pdf";
 
 export const pdfToolDefinitions = [
   {

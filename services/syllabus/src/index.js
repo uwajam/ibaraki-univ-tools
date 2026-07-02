@@ -15,7 +15,7 @@ import {
   searchCourses
 } from "./repository.js";
 
-export const syllabusApiBasePath = "/api/syllabus";
+export const syllabusApiBasePath = "/univ/ibaraki/syllabus";
 
 export const syllabusToolDefinitions = [
   {

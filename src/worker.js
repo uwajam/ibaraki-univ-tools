@@ -20,8 +20,8 @@ const ROBOTS_TXT = `# As a condition of accessing this website, you agree to abi
 User-agent: *
 Content-Signal: search=yes, ai-train=no
 Allow: /
-Disallow: /mcp
-Disallow: /api/
+Disallow: /iu
+Disallow: /univ/
 Disallow: /courses
 Disallow: /health
 Disallow: /status
@@ -30,10 +30,13 @@ Disallow: /status
 const appRoutes = [
   route("GET", "/", () => htmlResponse(SITE_HTML)),
   route("GET", "/robots.txt", () => textResponse(ROBOTS_TXT, "text/plain; charset=utf-8")),
-  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/mcp", (request, { env }) => handleMcpGatewayRequest(request, env)),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/iu", (request, { env }) => handleMcpGatewayRequest(request, env)),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/iu/:path*", (request, { env }) => handleMcpGatewayRequest(request, env)),
   route("GET", "/health", () => jsonResponse({ ok: true, service: "iu-mcp-gateway" })),
-  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/syllabus/:path*", (request, { env }) => handleSyllabusApiRequest(request, env)),
-  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/pdf/:path*", (request, { env }) => handlePdfApiRequest(request, env))
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/syllabus", (request, { env }) => handleSyllabusApiRequest(request, env)),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/syllabus/:path*", (request, { env }) => handleSyllabusApiRequest(request, env)),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/pdf", (request, { env }) => handlePdfApiRequest(request, env)),
+  route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/pdf/:path*", (request, { env }) => handlePdfApiRequest(request, env))
 ];
 
 const routeWorkerRequest = createRouter(appRoutes, { notFound: notFoundResponse });

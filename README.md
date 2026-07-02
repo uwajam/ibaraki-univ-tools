@@ -8,7 +8,7 @@
 
 公開Workerは大学サイトへリアルタイム検索を行いません。シラバス検索はD1に投入済みの静的データだけを読みます。
 
-説明サイト: `https://iu.mcp.uwaja.net/`
+MCP Gateway: `https://mcp.uwaja.net/iu`
 
 ## Disclaimer
 
@@ -60,13 +60,14 @@ src/worker.js
   - D1 prepared statementだけを使って検索・詳細取得を行います。
 - HTTP syllabus API
   - `services/syllabus/src/index.js`
-  - `/api/syllabus/search`、`/api/syllabus/courses/:id`、`/api/syllabus/health` を提供します。
+  - `/univ/ibaraki/syllabus/search`、`/univ/ibaraki/syllabus/courses/:id`、`/univ/ibaraki/syllabus/health` を提供します。
 - MCP tools
   - `services/*/src/index.js` の `*ToolDefinitions` に各サービスがtool schemaとAPI呼び出し先を定義します。
   - `apps/gateway/src/index.js` は各サービスのtool定義を集約し、tool呼び出し時に登録済みservice APIへ委譲します。
 - HTTP routing
   - `packages/shared/src/router.js` の `route()` / `createRouter()` でpath parameter付きルートを宣言します。
-  - 各service APIは `*ApiRoutes` として公開し、Workerは `/api/<service>/...` prefixで委譲します。
+  - 各service APIは `*ApiRoutes` として公開し、Workerは `/univ/ibaraki/<service>...` prefixで委譲します。
+  - `src/worker.js` は薄いHTTPルーターとして、大学APIとMCP Gatewayのprefixを各serviceへ渡すだけにします。
 
 ## Setup
 
@@ -179,22 +180,25 @@ GitHub Actionsの `Update PDF sources D1` は毎日 19:35 UTC、日本時間で�
 
 ## HTTP API
 
+大学APIの公開入口は `https://api.uwaja.net/univ/ibaraki/*` です。現時点ではシラバスAPIとPDF APIを扱います。
+
 ```text
-GET  /api/syllabus/health
-GET  /api/syllabus/search?academicYear=2026&query=入門&limit=20
-POST /api/syllabus/search
-GET  /api/syllabus/courses/:id
-GET  /api/pdf/health
-GET  /api/pdf/search?q=卒業要件&limit=10
-POST /api/pdf/search
-POST /mcp
+GET  /univ/ibaraki/syllabus/health
+GET  /univ/ibaraki/syllabus/search?academicYear=2026&query=入門&limit=20
+POST /univ/ibaraki/syllabus/search
+GET  /univ/ibaraki/syllabus/courses/:id
+GET  /univ/ibaraki/pdf/health
+GET  /univ/ibaraki/pdf/search?q=卒業要件&limit=10
+POST /univ/ibaraki/pdf/search
 ```
 
-`/api/syllabus/courses/:id` は `courseId`、`syllabusId`、科目番号、時間割コード、公式URLを受け付けます。URLを渡す場合はpath segmentとしてURL encodeしてください。
+`/univ/ibaraki/syllabus*` はシラバスAPI、`/univ/ibaraki/pdf*` はPDF APIです。将来 `library` などを増やす場合は、`/univ/ibaraki/library*` のように大学API配下へ追加します。
+
+`/univ/ibaraki/syllabus/courses/:id` は `courseId`、`syllabusId`、科目番号、時間割コード、公式URLを受け付けます。URLを渡す場合はpath segmentとしてURL encodeしてください。
 
 ## MCP
 
-`POST /mcp` は軽量なJSON-RPC endpointです。
+MCP Gatewayの公開入口は `https://mcp.uwaja.net/iu*` です。`POST /iu` は軽量なJSON-RPC endpointです。
 
 対応メソッド:
 
@@ -221,3 +225,13 @@ MCP GatewayはD1を直接参照しません。tool呼び出しは内部HTTP API�
 
 不具合報告は GitHub Issues をご利用ください。
 その他のお問い合わせは contact@uwaja.net までお願いいたします。
+
+## Public URL routing
+
+| Public URL | Worker path prefix | Handler |
+| --- | --- | --- |
+| `https://api.uwaja.net/univ/ibaraki/syllabus*` | `/univ/ibaraki/syllabus` | `handleSyllabusApiRequest()` |
+| `https://api.uwaja.net/univ/ibaraki/pdf*` | `/univ/ibaraki/pdf` | `handlePdfApiRequest()` |
+| `https://mcp.uwaja.net/iu*` | `/iu` | `handleMcpGatewayRequest()` |
+
+`wrangler.toml` は大学API全体を受ける `api.uwaja.net/univ/ibaraki/*` と、MCP Gatewayを受ける `mcp.uwaja.net/iu*` を登録します。Worker内では `src/worker.js` がprefixだけを見て、既存serviceのhandlerへ委譲します。
