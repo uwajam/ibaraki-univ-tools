@@ -3,9 +3,9 @@ main = "src/worker.js"
 compatibility_date = "2026-06-01"
 
 routes = [
-  { pattern = "api.uwaja.net/univ/ibaraki/syllabus*", custom_domain = false },
-  { pattern = "mcp.uwaja.net/iu*", custom_domain = false },
-  { pattern = "iu.mcp.uwaja.net/*", custom_domain = false }
+  { pattern = "api.uwaja.net/univ/ibaraki/*", custom_domain = false },
+  { pattern = "mcp.uwaja.net/iu", custom_domain = false },
+  { pattern = "mcp.uwaja.net/iu/*", custom_domain = false }
 ]
 
 [[d1_databases]]

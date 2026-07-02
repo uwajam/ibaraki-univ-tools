@@ -8,7 +8,7 @@
 
 公開Workerは大学サイトへリアルタイム検索を行いません。シラバス検索はD1に投入済みの静的データだけを読みます。
 
-説明サイト: `https://iu.mcp.uwaja.net/`
+MCP Gateway: `https://mcp.uwaja.net/iu`
 
 ## Disclaimer
 
@@ -60,13 +60,14 @@ src/worker.js
   - D1 prepared statementだけを使って検索・詳細取得を行います。
 - HTTP syllabus API
   - `services/syllabus/src/index.js`
-  - `/api/syllabus/search`、`/api/syllabus/courses/:id`、`/api/syllabus/health` を提供します。
+  - `/univ/ibaraki/syllabus/search`、`/univ/ibaraki/syllabus/courses/:id`、`/univ/ibaraki/syllabus/health` を提供します。
 - MCP tools
   - `services/*/src/index.js` の `*ToolDefinitions` に各サービスがtool schemaとAPI呼び出し先を定義します。
   - `apps/gateway/src/index.js` は各サービスのtool定義を集約し、tool呼び出し時に登録済みservice APIへ委譲します。
 - HTTP routing
   - `packages/shared/src/router.js` の `route()` / `createRouter()` でpath parameter付きルートを宣言します。
-  - 各service APIは `*ApiRoutes` として公開し、Workerは `/api/<service>/...` prefixで委譲します。
+  - 各service APIは `*ApiRoutes` として公開し、Workerは `/univ/ibaraki/<service>...` prefixで委譲します。
+  - `src/worker.js` は薄いHTTPルーターとして、大学APIとMCP Gatewayのprefixを各serviceへ渡すだけにします。
 
 ## Setup
 
@@ -179,22 +180,25 @@ GitHub Actionsの `Update PDF sources D1` は毎日 19:35 UTC、日本時間で�
 
 ## HTTP API
 
+大学APIの公開入口は `https://api.uwaja.net/univ/ibaraki/*` です。現時点ではシラバスAPIとPDF APIを扱います。
+
 ```text
-GET  /api/syllabus/health
-GET  /api/syllabus/search?academicYear=2026&query=入門&limit=20
-POST /api/syllabus/search
-GET  /api/syllabus/courses/:id
-GET  /api/pdf/health
-GET  /api/pdf/search?q=卒業要件&limit=10
-POST /api/pdf/search
-POST /mcp
+GET  /univ/ibaraki/syllabus/health
+GET  /univ/ibaraki/syllabus/search?academicYear=2026&query=入門&limit=20
+POST /univ/ibaraki/syllabus/search
+GET  /univ/ibaraki/syllabus/courses/:id
+GET  /univ/ibaraki/pdf/health
+GET  /univ/ibaraki/pdf/search?q=卒業要件&limit=10
+POST /univ/ibaraki/pdf/search
 ```
 
-`/api/syllabus/courses/:id` は `courseId`、`syllabusId`、科目番号、時間割コード、公式URLを受け付けます。URLを渡す場合はpath segmentとしてURL encodeしてください。
+`/univ/ibaraki/syllabus*` はシラバスAPI、`/univ/ibaraki/pdf*` はPDF APIです。将来 `library` などを増やす場合は、`/univ/ibaraki/library*` のように大学API配下へ追加します。
+
+`/univ/ibaraki/syllabus/courses/:id` は `courseId`、`syllabusId`、科目番号、時間割コード、公式URLを受け付けます。URLを渡す場合はpath segmentとしてURL encodeしてください。
 
 ## MCP
 
-`POST /mcp` は軽量なJSON-RPC endpointです。
+MCP Gatewayの公開入口は `https://mcp.uwaja.net/iu*` です。`POST /iu` は軽量なJSON-RPC endpointです。
 
 対応メソッド:
 
@@ -222,44 +226,12 @@ MCP GatewayはD1を直接参照しません。tool呼び出しは内部HTTP API�
 不具合報告は GitHub Issues をご利用ください。
 その他のお問い合わせは contact@uwaja.net までお願いいたします。
 
-## URL migration plan
+## Public URL routing
 
-シラバスJSON APIとMCP入口を段階的に分離するため、新旧URLを並行稼働します。まずWorker内の共通ハンドラへ委譲し、D1/KV/環境変数やレスポンス形式は維持します。
+| Public URL | Worker path prefix | Handler |
+| --- | --- | --- |
+| `https://api.uwaja.net/univ/ibaraki/syllabus*` | `/univ/ibaraki/syllabus` | `handleSyllabusApiRequest()` |
+| `https://api.uwaja.net/univ/ibaraki/pdf*` | `/univ/ibaraki/pdf` | `handlePdfApiRequest()` |
+| `https://mcp.uwaja.net/iu*` | `/iu` | `handleMcpGatewayRequest()` |
 
-| 旧URL | 新URL | 用途 | 移行中の扱い |
-| --- | --- | --- | --- |
-| `https://iu.mcp.uwaja.net/api/syllabus/timetable-codes/` | `https://api.uwaja.net/univ/ibaraki/syllabus/timetable-codes/` | 時間割コードからシラバスを取得 | 旧URLも同じハンドラで処理し、`Deprecation: true` を返します。 |
-| `https://iu.mcp.uwaja.net/api/syllabus/...` | `https://api.uwaja.net/univ/ibaraki/syllabus/...` | シラバスJSON API全般 | 旧URLも同じハンドラで処理し、`Deprecation: true` を返します。 |
-| `https://iu.mcp.uwaja.net/mcp` | `https://mcp.uwaja.net/iu` | MCP JSON-RPC入口 | 新旧URLとも同じMCP Gatewayハンドラで処理します。 |
-| `https://iu.mcp.uwaja.net/` | `https://mcp.uwaja.net/iu` | MCPクライアント向け入口の案内 | 説明サイトは旧ホストで維持し、MCPクライアントは新URLへ移行します。 |
-
-### Recommended migration workflow
-
-1. 現在の構成確認
-   - `src/worker.js` でWorker入口のprefix委譲を確認します。
-   - `services/syllabus/src/index.js` でシラバスAPIのroute定義と公開されているエンドポイントを確認します。
-   - `apps/gateway/src/index.js` でMCP toolがどのservice API pathを呼ぶか確認します。
-   - `wrangler.toml` でWorkerに紐づくroutes、D1 binding、環境変数を確認します。
-2. 共通ハンドラの切り出し
-   - シラバスAPIの実処理は `services/syllabus/src/index.js` に集約し、ホスト名には依存させません。
-   - 新base pathは `/univ/ibaraki/syllabus`、旧base pathは `/api/syllabus` として、同じroute配列を生成します。
-3. ルーティング分岐の追加
-   - `src/worker.js` では `api.uwaja.net/univ/ibaraki/syllabus/*` 相当のpathを `handleSyllabusApiRequest()` へ委譲します。
-   - 旧 `iu.mcp.uwaja.net/api/syllabus/*` 相当のpathも同じハンドラへ委譲し、レスポンスヘッダーに `Deprecation: true` を付けます。
-   - `mcp.uwaja.net/iu` と `mcp.uwaja.net/iu/*` は `handleMcpGatewayRequest()` へ委譲します。
-4. MCP tool呼び出し先の切り替え
-   - `services/syllabus/src/index.js` のtool定義は新API path `/univ/ibaraki/syllabus/*` を返すようにします。
-   - `apps/gateway/src/index.js` のservice clientは新旧シラバスAPI prefixを受けられるようにし、外部API base URLを設定していない場合はWorker内ハンドラを直接呼びます。
-5. wrangler routesの更新タイミング
-   - コードが新旧pathの両方を処理できる状態になってから `wrangler.toml` のroutesへ `api.uwaja.net/univ/ibaraki/syllabus*`、`mcp.uwaja.net/iu*`、`iu.mcp.uwaja.net/*` を追加します。
-   - DNS/Cloudflare側のroute反映前にデプロイしても旧URLは維持されるため、破壊的変更を避けられます。
-6. ローカル確認
-   - 構文確認: `npm run check`
-   - Worker起動: `npm run dev`
-   - 別端末から例として `curl http://localhost:8787/univ/ibaraki/syllabus/health`、`curl -i http://localhost:8787/api/syllabus/health`、MCP initializeのPOSTを確認します。
-7. 本番反映
-   - 先にD1 bindingと既存secrets/envが変わっていないことを確認します。
-   - `npm run deploy` でWorkerをデプロイします。
-   - 新API、新MCP、旧APIの順に疎通確認します。
-   - 旧APIレスポンスに `Deprecation: true` が付くことを確認します。
-   - クライアントやドキュメントを新URLへ移行し、アクセスログを見ながら旧URLの終了時期を別途決めます。
+`wrangler.toml` は大学API全体を受ける `api.uwaja.net/univ/ibaraki/*` と、MCP Gatewayを受ける `mcp.uwaja.net/iu*` を登録します。Worker内では `src/worker.js` がprefixだけを見て、既存serviceのhandlerへ委譲します。

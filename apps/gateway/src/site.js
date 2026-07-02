@@ -523,7 +523,7 @@ export const SITE_HTML = `<!doctype html>
           <div class="panel-top">
             <div>
               <span class="panel-title">MCP Server URL</span>
-              <span class="panel-meta">https://iu.mcp.uwaja.net/mcp</span>
+              <span class="panel-meta">https://mcp.uwaja.net/iu</span>
             </div>
             <span class="badge">ready</span>
           </div>
@@ -624,9 +624,9 @@ export const SITE_HTML = `<!doctype html>
           <h3>HTTP APIとしても利用できます</h3>
           <p>MCPクライアントを使わず、保存済みのシラバスデータを直接JSONで取得できます。時間割コードから授業詳細を取得する場合は、年度を指定すると安定します。</p>
           <div class="api-list">
-            <code>GET /api/syllabus/timetable-codes/T3003?academicYear=2026</code>
-            <code>GET /api/syllabus/courses/T3003?academicYear=2026</code>
-            <code>GET /api/syllabus/search?q=情報&amp;academicYear=2026</code>
+            <code>GET /univ/ibaraki/syllabus/timetable-codes/T3003?academicYear=2026</code>
+            <code>GET /univ/ibaraki/syllabus/courses/T3003?academicYear=2026</code>
+            <code>GET /univ/ibaraki/syllabus/search?q=情報&amp;academicYear=2026</code>
           </div>
         </div>
       </div>
@@ -640,14 +640,14 @@ export const SITE_HTML = `<!doctype html>
         </div>
         <div class="connect">
           <div class="connect-steps">
-            <article class="connect-step"><strong>STEP 01</strong><h3>URLを確認する</h3><p>登録先は <code>/mcp</code> で終わるURLです。この説明ページのURLではなく、下のMCP Server URLを使います。</p></article>
+            <article class="connect-step"><strong>STEP 01</strong><h3>URLを確認する</h3><p>登録先は <code>/iu</code> で終わるURLです。この説明ページのURLではなく、下のMCP Server URLを使います。</p></article>
             <article class="connect-step"><strong>STEP 02</strong><h3>クライアントに追加する</h3><p>CodexまたはClaude Codeのどちらかのコマンドを実行します。普段使うプロジェクトにだけ登録できます。</p></article>
             <article class="connect-step"><strong>STEP 03</strong><h3>質問して使う</h3><p>「授業を探して」「履修要項PDFから該当箇所を探して」のように、そのまま日本語で依頼します。</p></article>
           </div>
           <div class="endpoint">
             <div>
               <span class="endpoint-label">MCP Server URL</span>
-              <code id="copy-endpoint">https://iu.mcp.uwaja.net/mcp</code>
+              <code id="copy-endpoint">https://mcp.uwaja.net/iu</code>
             </div>
             <button class="copy light" data-copy="endpoint">Copy</button>
           </div>
@@ -738,8 +738,8 @@ export const SITE_HTML = `<!doctype html>
     async function loadCoverage() {
       try {
         const [syllabus, pdf] = await Promise.all([
-          fetch('/api/syllabus/health').then((response) => response.json()),
-          fetch('/api/pdf/health').then((response) => response.json())
+          fetch('/univ/ibaraki/syllabus/health').then((response) => response.json()),
+          fetch('/univ/ibaraki/pdf/health').then((response) => response.json())
         ]);
         renderYears('syllabus-years', 'syllabus-count', syllabus.years, 'courseCount');
         renderYears('pdf-years', 'pdf-count', pdf.years, 'documentCount');

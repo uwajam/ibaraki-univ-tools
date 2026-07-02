@@ -18,7 +18,7 @@ MIGRATION = ROOT / "migrations" / "0001_schema.sql"
 BASE_URL = "https://syllabus.ibaraki.ac.jp"
 ENTRY_URL = f"{BASE_URL}/syllabus_ref/"
 SEARCH_ACTION = f"{BASE_URL}/syllabus_ref/campussquare.do"
-USER_AGENT = "Mozilla/5.0 (compatible; iu-mcp-syllabus-crawler/0.1; +https://syllabus.iu.mcp.uwaja.net)"
+USER_AGENT = "Mozilla/5.0 (compatible; iu-mcp-syllabus-crawler/0.1; +https://mcp.uwaja.net/iu)"
 
 
 class NoRedirect(HTTPRedirectHandler):

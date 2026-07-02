@@ -15,10 +15,7 @@ import {
   searchCourses
 } from "./repository.js";
 
-export const legacySyllabusApiBasePath = "/api/syllabus";
 export const syllabusApiBasePath = "/univ/ibaraki/syllabus";
-
-const syllabusApiBasePaths = [syllabusApiBasePath, legacySyllabusApiBasePath];
 
 export const syllabusToolDefinitions = [
   {
@@ -56,24 +53,24 @@ export const syllabusToolDefinitions = [
   }
 ];
 
-export const syllabusApiRoutes = syllabusApiBasePaths.flatMap((basePath) => [
-  route("GET", `${basePath}/health`, async (_request, { env }) => {
+export const syllabusApiRoutes = [
+  route("GET", `${syllabusApiBasePath}/health`, async (_request, { env }) => {
     return jsonResponse({ ok: true, service: "iu-syllabus-service", ...(await getSyllabusStats(env.DB)) });
   }),
-  route("GET", `${basePath}/search`, async (request, { env }) => {
+  route("GET", `${syllabusApiBasePath}/search`, async (request, { env }) => {
     const url = new URL(request.url);
     return jsonResponse(await searchCourses(env.DB, argsFromSearchParams(url.searchParams, ["academicYear", "limit"])));
   }),
-  route("POST", `${basePath}/search`, async (request, { env }) => {
+  route("POST", `${syllabusApiBasePath}/search`, async (request, { env }) => {
     return jsonResponse(await searchCourses(env.DB, await readJsonBody(request)));
   }),
-  route(["PUT", "PATCH", "DELETE"], `${basePath}/search`, () => methodNotAllowedResponse("GET, POST, OPTIONS")),
-  route("GET", `${basePath}/timetable-codes/:timetableCode`, async (request, { env }, { params }) => {
+  route(["PUT", "PATCH", "DELETE"], `${syllabusApiBasePath}/search`, () => methodNotAllowedResponse("GET, POST, OPTIONS")),
+  route("GET", `${syllabusApiBasePath}/timetable-codes/:timetableCode`, async (request, { env }, { params }) => {
     const url = new URL(request.url);
     const result = await getCourseByTimetableCode(env.DB, params.timetableCode, numberParam(url.searchParams.get("academicYear")));
     return jsonResponse(result, result.error ? 404 : 200);
   }),
-  route("GET", `${basePath}/courses/:key*`, async (request, { env }, { params }) => {
+  route("GET", `${syllabusApiBasePath}/courses/:key*`, async (request, { env }, { params }) => {
     const url = new URL(request.url);
     const key = params.key;
     const yearAndSyllabus = key.match(/^(20\d{2})\/([0-9A-Z]+_[A-Z0-9-]+)$/);
@@ -84,7 +81,7 @@ export const syllabusApiRoutes = syllabusApiBasePaths.flatMap((basePath) => [
         : await getCourse(env.DB, key);
     return jsonResponse(result, result.error ? 404 : 200);
   })
-]);
+];
 
 const routeSyllabusApiRequest = createRouter(syllabusApiRoutes);
 

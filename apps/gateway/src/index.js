@@ -1,7 +1,7 @@
 import { emptyResponse, jsonResponse, rpcError, rpcResult } from "../../../packages/shared/src/http.js";
 import { methodNotAllowedResponse } from "../../../packages/shared/src/router.js";
-import { handlePdfApiRequest, pdfToolDefinitions } from "../../../services/pdf/src/index.js";
-import { handleSyllabusApiRequest, legacySyllabusApiBasePath, syllabusApiBasePath, syllabusToolDefinitions } from "../../../services/syllabus/src/index.js";
+import { handlePdfApiRequest, pdfApiBasePath, pdfToolDefinitions } from "../../../services/pdf/src/index.js";
+import { handleSyllabusApiRequest, syllabusApiBasePath, syllabusToolDefinitions } from "../../../services/syllabus/src/index.js";
 
 const SERVER_INFO = {
   name: "iu-mcp-gateway",
@@ -16,12 +16,7 @@ const SERVICE_CLIENTS = {
     handler: handleSyllabusApiRequest,
     errorLabel: "syllabus api error"
   },
-  [`${legacySyllabusApiBasePath}/`]: {
-    baseUrlEnv: "SYLLABUS_API_BASE_URL",
-    handler: handleSyllabusApiRequest,
-    errorLabel: "syllabus api error"
-  },
-  "/api/pdf/": {
+  [`${pdfApiBasePath}/`]: {
     baseUrlEnv: "PDF_API_BASE_URL",
     handler: handlePdfApiRequest,
     errorLabel: "pdf api error"
