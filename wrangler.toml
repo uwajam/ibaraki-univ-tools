@@ -1,4 +1,4 @@
-name = "iu-mcp"
+name = "ibaraki-univ-tools"
 main = "src/worker.js"
 compatibility_date = "2026-06-01"
 

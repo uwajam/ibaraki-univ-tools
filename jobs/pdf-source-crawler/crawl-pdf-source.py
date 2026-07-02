@@ -20,7 +20,7 @@ DEFAULT_DB = ROOT / "work" / "iu_mcp.sqlite"
 DEFAULT_PDF_DIR = ROOT / "work" / "pdf-source"
 DEFAULT_SOURCE_PAGE_URL = "https://www.eng.ibaraki.ac.jp/education/class/"
 DEFAULT_CATEGORY = "engineering-course-registration"
-USER_AGENT = "Mozilla/5.0 (compatible; iu-mcp-pdf-source-crawler/0.1; +https://mcp.uwaja.net/iu)"
+USER_AGENT = "Mozilla/5.0 (compatible; ibaraki-univ-tools-pdf-source-crawler/0.1; +https://mcp.uwaja.net/iu)"
 
 
 class PdfLinkParser(HTMLParser):

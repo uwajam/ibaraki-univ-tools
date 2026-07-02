@@ -1,8 +1,6 @@
-# iu-mcp
+# ibaraki-univ-tools
 
-茨城大学の公開学務情報をMCP経由で利用するためのCloudflare Workersプロジェクトです。
-
-表示名は「茨城大学学務情報MCP」です。リポジトリ名・Worker名・MCP登録名は `iu-mcp` に寄せています。
+茨城大学の公開教務情報を収集・正規化し、HTTP APIとMCP Gatewayから利用できるようにするCloudflare Workersプロジェクトです。
 
 現在はシラバス検索・詳細取得と、公開PDFの全文検索に対応しています。今後、対象PDFの拡充と図書館キャッシュAPIを追加する予定です。
 
@@ -10,17 +8,13 @@
 
 MCP Gateway: `https://mcp.uwaja.net/iu`
 
-## Disclaimer
-
-このプロジェクトは茨城大学公式ではありません。扱うのは公開情報のみです。個人の履修情報、manaba、メール、休講情報、成績、学生アカウントに紐づく情報は含めません。
-
 ## Architecture
 
 外部から見ると1つのMCPサーバーですが、内部ではGateway層とservice API層を分けています。
 
 ```text
 apps/gateway
-  MCP endpointと説明サイト。DBやcrawlerには触らず、service APIをfetchする。
+  MCP JSON-RPC endpoint。tools/listとtools/callを扱い、DBやcrawlerには触らずservice APIをfetchする。
 
 services/syllabus
   シラバス検索・詳細取得API。D1 schemaに沿って検索する。
@@ -44,7 +38,7 @@ migrations
   D1 schema。
 
 src/worker.js
-  Cloudflare Workerの薄いHTTPルーター。サービス追加時はservice側のroute/tool定義を増やし、ここではprefix委譲だけを追加する。
+  Cloudflare Workerの薄いprefix router。公開ページは返さず、サービス追加時はservice側のroute/tool定義を増やして、ここではprefix委譲だけを追加する。
 ```
 
 ## Responsibility
@@ -67,7 +61,7 @@ src/worker.js
 - HTTP routing
   - `packages/shared/src/router.js` の `route()` / `createRouter()` でpath parameter付きルートを宣言します。
   - 各service APIは `*ApiRoutes` として公開し、Workerは `/univ/ibaraki/<service>...` prefixで委譲します。
-  - `src/worker.js` は薄いHTTPルーターとして、大学APIとMCP Gatewayのprefixを各serviceへ渡すだけにします。
+  - `src/worker.js` は公開ページを返さず、大学APIとMCP Gatewayのprefixを各serviceへ渡すだけにします。
 
 ## Setup
 
@@ -180,7 +174,7 @@ GitHub Actionsの `Update PDF sources D1` は毎日 19:35 UTC、日本時間で�
 
 ## HTTP API
 
-大学APIの公開入口は `https://api.uwaja.net/univ/ibaraki/*` です。現時点ではシラバスAPIとPDF APIを扱います。
+大学APIの公開入口は `https://api.uwaja.net/univ/ibaraki/*` です。この入口の内側で、現在は `/syllabus` をシラバスAPI、`/pdf` をPDF APIへ委譲します。
 
 ```text
 GET  /univ/ibaraki/syllabus/health
@@ -198,7 +192,7 @@ POST /univ/ibaraki/pdf/search
 
 ## MCP
 
-MCP Gatewayの公開入口は `https://mcp.uwaja.net/iu*` です。`POST /iu` は軽量なJSON-RPC endpointです。
+MCP Gatewayの公開入口は `https://mcp.uwaja.net/iu` と `https://mcp.uwaja.net/iu/*` です。`POST /iu` は軽量なJSON-RPC endpointです。
 
 対応メソッド:
 
@@ -216,7 +210,6 @@ MCP GatewayはD1を直接参照しません。tool呼び出しは内部HTTP API�
 
 ## Security
 
-- リアルタイム検索は公開APIに入れていません。
 - SQLはD1 prepared statementだけを使います。
 - `courseId` 系入力はrepository側で想定形式に寄せています。
 - raw HTMLはD1に入れず、APIレスポンスにも返しません。
@@ -224,7 +217,6 @@ MCP GatewayはD1を直接参照しません。tool呼び出しは内部HTTP API�
 ## Contact
 
 不具合報告は GitHub Issues をご利用ください。
-その他のお問い合わせは contact@uwaja.net までお願いいたします。
 
 ## Public URL routing
 
@@ -232,6 +224,7 @@ MCP GatewayはD1を直接参照しません。tool呼び出しは内部HTTP API�
 | --- | --- | --- |
 | `https://api.uwaja.net/univ/ibaraki/syllabus*` | `/univ/ibaraki/syllabus` | `handleSyllabusApiRequest()` |
 | `https://api.uwaja.net/univ/ibaraki/pdf*` | `/univ/ibaraki/pdf` | `handlePdfApiRequest()` |
-| `https://mcp.uwaja.net/iu*` | `/iu` | `handleMcpGatewayRequest()` |
+| `https://mcp.uwaja.net/iu` | `/iu` | `handleMcpGatewayRequest()` |
+| `https://mcp.uwaja.net/iu/*` | `/iu/*` | `handleMcpGatewayRequest()` |
 
-`wrangler.toml` は大学API全体を受ける `api.uwaja.net/univ/ibaraki/*` と、MCP Gatewayを受ける `mcp.uwaja.net/iu*` を登録します。Worker内では `src/worker.js` がprefixだけを見て、既存serviceのhandlerへ委譲します。
+`wrangler.toml` は `api.uwaja.net/univ/ibaraki/*`、`mcp.uwaja.net/iu`、`mcp.uwaja.net/iu/*` を登録します。Worker内では `src/worker.js` がprefixだけを見て、既存serviceのhandlerへ委譲します。将来 `library` を追加する場合は、`api.uwaja.net/univ/ibaraki/library*` のように大学API配下へ追加します。

@@ -20,7 +20,7 @@ DEFAULT_DOCUMENT_ID = "ibaraki-eng-course-registration-2026"
 DEFAULT_TITLE = "茨城大学工学部 履修要項 令和8年度入学者用（2026）"
 DEFAULT_SOURCE_URL = "https://www.eng.ibaraki.ac.jp/common/education/class/2026-course-registration02.pdf"
 DEFAULT_CATEGORY = "course-registration"
-USER_AGENT = "Mozilla/5.0 (compatible; iu-mcp-pdf-importer/0.1; +https://mcp.uwaja.net/iu)"
+USER_AGENT = "Mozilla/5.0 (compatible; ibaraki-univ-tools-pdf-importer/0.1; +https://mcp.uwaja.net/iu)"
 
 
 def main():
