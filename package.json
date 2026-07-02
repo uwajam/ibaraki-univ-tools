@@ -1,7 +1,7 @@
 {
-  "name": "iu-mcp",
+  "name": "ibaraki-univ-tools",
   "version": "0.1.0",
-  "description": "MCP gateway for public Ibaraki University academic information.",
+  "description": "Cloudflare Workers API and MCP tools for public Ibaraki University academic information.",
   "type": "module",
   "scripts": {
     "check": "node --check src/worker.js && node --check apps/gateway/src/index.js && node --check services/syllabus/src/index.js && node --check services/syllabus/src/repository.js && node --check services/pdf/src/index.js && node --check services/pdf/src/repository.js && node --check packages/shared/src/http.js && node --check packages/shared/src/router.js",

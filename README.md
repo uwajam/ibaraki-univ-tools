@@ -1,8 +1,6 @@
-# iu-mcp
+# ibaraki-univ-tools
 
-茨城大学の公開教務情報をMCP経由で利用するためのCloudflare Workersプロジェクトです。
-
-リポジトリ名・Worker名・MCP登録名は `iu-mcp` に寄せています。
+茨城大学の公開教務情報を収集・正規化し、HTTP APIとMCP Gatewayから利用できるようにするCloudflare Workersプロジェクトです。
 
 現在はシラバス検索・詳細取得と、公開PDFの全文検索に対応しています。今後、対象PDFの拡充と図書館キャッシュAPIを追加する予定です。
 

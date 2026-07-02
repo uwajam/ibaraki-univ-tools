@@ -4,7 +4,7 @@ import { handlePdfApiRequest, pdfApiBasePath, pdfToolDefinitions } from "../../.
 import { handleSyllabusApiRequest, syllabusApiBasePath, syllabusToolDefinitions } from "../../../services/syllabus/src/index.js";
 
 const SERVER_INFO = {
-  name: "iu-mcp-gateway",
+  name: "ibaraki-univ-tools-gateway",
   version: "0.2.0"
 };
 

@@ -7,7 +7,7 @@ import { emptyResponse, jsonResponse, notFoundResponse } from "../packages/share
 const appRoutes = [
   route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/iu", (request, { env }) => handleMcpGatewayRequest(request, env)),
   route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/iu/:path*", (request, { env }) => handleMcpGatewayRequest(request, env)),
-  route("GET", "/health", () => jsonResponse({ ok: true, service: "iu-mcp-gateway" })),
+  route("GET", "/health", () => jsonResponse({ ok: true, service: "ibaraki-univ-tools-gateway" })),
   route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/syllabus", (request, { env }) => handleSyllabusApiRequest(request, env)),
   route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/syllabus/:path*", (request, { env }) => handleSyllabusApiRequest(request, env)),
   route(["GET", "POST", "PUT", "PATCH", "DELETE"], "/univ/ibaraki/pdf", (request, { env }) => handlePdfApiRequest(request, env)),
